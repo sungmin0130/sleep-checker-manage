@@ -2,35 +2,43 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>관리자 통계 차트</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>수면/카페인 분포 관리자 통계</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.5.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.5.2/firebase-firestore-compat.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
 </head>
 <body>
   <div class="container">
-    <h1>📊 관리자 수면 통계 차트</h1>
-    <!-- 그래프 전환 버튼 -->
-<div class="chart-controls">
-  <label for="chartTypeSelect">그래프 모양 선택:</label>
-  <select id="chartTypeSelect">
-    <option value="bar">막대그래프</option>
-    <option value="line">선그래프</option>
-    <option value="pie">원그래프</option>
-    <option value="doughnut">도넛그래프</option>
-    <option value="radar">레이더그래프</option>
-  </select>
-</div>
-<button id="downloadPdfBtn">📄 PDF로 저장</button>
-<button id="downloadExcelBtn">📊 Excel로 저장</button>
+    <h1>📊 관리자 통계 - 수면 시간 / 카페인 섭취</h1>
 
-    <canvas id="genderChart" width="400" height="300"></canvas>
-    <canvas id="gradeChart" width="400" height="300" style="margin-top: 50px;"></canvas>
+    <div class="controls">
+      <label for="dataType">항목 선택:</label>
+      <select id="dataType">
+        <option value="weekdaySleep">평일 수면 시간</option>
+        <option value="weekendSleep">주말 수면 시간</option>
+        <option value="caffeine">카페인 섭취량</option>
+      </select>
+
+      <label for="chartType">그래프 유형:</label>
+      <select id="chartType">
+        <option value="bar">막대그래프</option>
+        <option value="pie">원그래프</option>
+        <option value="doughnut">도넛그래프</option>
+      </select>
+    </div>
+
+    <canvas id="statChart"></canvas>
+
+    <div class="buttons">
+      <button id="downloadExcel">Excel로 다운로드</button>
+      <button id="downloadPdf">PDF로 다운로드</button>
+    </div>
   </div>
+
   <script src="admin.js"></script>
 </body>
 </html>

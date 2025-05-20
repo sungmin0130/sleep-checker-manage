@@ -1,4 +1,3 @@
-// Firebase 초기화
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
   authDomain: "sleep-checker.firebaseapp.com",
@@ -7,104 +6,95 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-let currentGenderChart = null;
-let currentGradeChart = null;
+let currentChart = null;
 
-async function loadAndRenderCharts(chartType = "bar") {
-  const snapshot = await db.collection("sleepRecords").get();
-  const data = snapshot.docs.map(doc => doc.data());
-
-  const genderGroups = { 남자: [], 여자: [] };
-  const gradeGroups = { 1: [], 2: [], 3: [] };
-
-  data.forEach(entry => {
-    if (entry.gender && genderGroups[entry.gender]) {
-      genderGroups[entry.gender].push(entry.weekdaySleep);
-    }
-    if (entry.grade && gradeGroups[entry.grade]) {
-      gradeGroups[entry.grade].push(entry.weekdaySleep);
-    }
+function groupByRange(values, rangeSize) {
+  const grouped = {};
+  values.forEach(v => {
+    const group = Math.floor(v / rangeSize) * rangeSize;
+    const label = `${group}~${group + rangeSize}`;
+    if (!grouped[label]) grouped[label] = 0;
+    grouped[label]++;
   });
+  return grouped;
+}
 
-  const avg = arr => arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(2) : 0;
+function drawChart(grouped, chartType, label) {
+  const labels = Object.keys(grouped);
+  const values = Object.values(grouped);
+  const total = values.reduce((a, b) => a + b, 0);
+  const percentages = values.map(v => ((v / total) * 100).toFixed(1));
 
-  // 이전 차트 제거
-  if (currentGenderChart) currentGenderChart.destroy();
-  if (currentGradeChart) currentGradeChart.destroy();
+  if (currentChart) currentChart.destroy();
 
-  // 성별 차트 생성
-  currentGenderChart = new Chart(document.getElementById("genderChart"), {
+  currentChart = new Chart(document.getElementById("statChart"), {
     type: chartType,
     data: {
-      labels: ["남자", "여자"],
+      labels,
       datasets: [{
-        label: "평일 평균 수면 시간",
-        data: [avg(genderGroups["남자"]), avg(genderGroups["여자"])],
-        backgroundColor: ["#42a5f5", "#ef5350"]
+        label: `${label} 분포 (%)`,
+        data: percentages,
+        backgroundColor: [
+          "#42a5f5", "#66bb6a", "#ffa726", "#ab47bc", "#ec407a", "#26a69a", "#ff7043", "#9ccc65"
+        ]
       }]
     },
     options: {
       responsive: true,
-      plugins: { legend: { display: chartType !== "bar" } },
-      scales: chartType === "bar" || chartType === "line" ? {
-        y: {
-          beginAtZero: true,
-          title: { display: true, text: "시간" }
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.label}: ${ctx.raw}%`
+          }
         }
-      } : {}
-    }
-  });
-
-  // 학년 차트 생성
-  currentGradeChart = new Chart(document.getElementById("gradeChart"), {
-    type: chartType,
-    data: {
-      labels: ["1학년", "2학년", "3학년"],
-      datasets: [{
-        label: "평일 평균 수면 시간",
-        data: [avg(gradeGroups[1]), avg(gradeGroups[2]), avg(gradeGroups[3])],
-        backgroundColor: ["#81c784", "#4db6ac", "#ba68c8"]
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: chartType !== "bar" } },
-      scales: chartType === "bar" || chartType === "line" ? {
-        y: {
-          beginAtZero: true,
-          title: { display: true, text: "시간" }
-        }
-      } : {}
+      }
     }
   });
 }
 
-window.addEventListener("DOMContentLoaded", () => {
-  loadAndRenderCharts("bar");
+async function loadAndRender() {
+  const dataType = document.getElementById("dataType").value;
+  const chartType = document.getElementById("chartType").value;
 
-  document.getElementById("chartTypeSelect").addEventListener("change", (e) => {
-    const selectedType = e.target.value;
-    loadAndRenderCharts(selectedType);
-  });
-});
-
-document.getElementById("downloadPdfBtn").addEventListener("click", () => {
-  const element = document.querySelector(".container");
-  html2pdf().from(element).set({
-    margin: 10,
-    filename: "수면_통계_차트.pdf",
-    image: { type: "jpeg", quality: 0.98 },
-    html2canvas: { scale: 2 },
-    jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
-  }).save();
-});
-document.getElementById("downloadExcelBtn").addEventListener("click", async () => {
   const snapshot = await db.collection("sleepRecords").get();
-  const data = snapshot.docs.map(doc => doc.data());
+  const values = snapshot.docs.map(doc => doc.data()[dataType]).filter(v => typeof v === "number");
 
-  const worksheet = XLSX.utils.json_to_sheet(data);
+  const rangeSize = dataType === "caffeine" ? 50 : 0.5;
+  const label = dataType === "weekdaySleep" ? "평일 수면 시간"
+              : dataType === "weekendSleep" ? "주말 수면 시간" : "카페인 섭취량";
+
+  const grouped = groupByRange(values, rangeSize);
+  drawChart(grouped, chartType, label);
+  
+}
+
+function downloadExcel() {
+  const labels = currentChart.data.labels;
+  const data = currentChart.data.datasets[0].data;
+  const rows = labels.map((label, i) => ({ 구간: label, 비율: `${data[i]}%` }));
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Sleep Data");
+  XLSX.utils.book_append_sheet(workbook, worksheet, "통계");
+  XLSX.writeFile(workbook, "통계_분포.xlsx");
+}
 
-  XLSX.writeFile(workbook, "수면_데이터.xlsx");
+function downloadPdf() {
+  const container = document.querySelector(".container");
+  html2pdf().from(container).set({
+    margin: 10,
+    filename: "통계_분포.pdf",
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2 },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  }).save();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("dataType").addEventListener("change", loadAndRender);
+  document.getElementById("chartType").addEventListener("change", loadAndRender);
+  document.getElementById("downloadExcel").addEventListener("click", downloadExcel);
+  document.getElementById("downloadPdf").addEventListener("click", downloadPdf);
+  loadAndRender();
 });
