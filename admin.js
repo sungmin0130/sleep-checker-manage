@@ -43,14 +43,33 @@ function drawChart(grouped, chartType, label) {
       responsive: true,
       plugins: {
         legend: { position: 'bottom' },
+        datalabels: {
+          color: '#333',
+          font: { weight: 'bold' },
+          formatter: value => `${value}%`,
+          anchor: chartType === 'bar' ? 'end' : 'center',
+          align: chartType === 'bar' ? 'top' : 'center',
+          offset: 4
+        },
         tooltip: {
           callbacks: {
             label: ctx => `${ctx.label}: ${ctx.raw}%`
           }
         }
       }
-    }
+    },
+    plugins: [ChartDataLabels]
   });
+}
+
+function calcSummaryStats(values) {
+  const n = values.length;
+  const mean = (values.reduce((a, b) => a + b, 0) / n).toFixed(2);
+  const max = Math.max(...values).toFixed(2);
+  const std = Math.sqrt(values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / n).toFixed(2);
+
+  document.getElementById("summaryStats").innerText =
+    `평균: ${mean} / 최댓값: ${max} / 표준편차: ${std}`;
 }
 
 async function loadAndRender() {
@@ -66,7 +85,7 @@ async function loadAndRender() {
 
   const grouped = groupByRange(values, rangeSize);
   drawChart(grouped, chartType, label);
-  
+  calcSummaryStats(values);
 }
 
 function downloadExcel() {
